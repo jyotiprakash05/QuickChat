@@ -1,0 +1,12 @@
+{
+  "name": "quickchat-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.525.0",
+    "@aws-sdk/lib-dynamodb": "^3.525.0",
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.525.0",
+    "uuid": "^9.0.1"
+  }
+}
