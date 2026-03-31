@@ -1,13 +1,13 @@
 version = 0.1
 
 [default.deploy.parameters]
-stack_name = "quickchat-backend"
+stack_name = "quickchat-v2"
 resolve_s3 = true
 s3_prefix = "quickchat-backend"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 disable_rollback = true
-parameter_overrides = "Stage=\"prod\" CognitoUserPoolId=\"ap-south-1_vEcE7h2g2\""
+parameter_overrides = "Stage=\"prod\" CognitoUserPoolId=\"ap-south-1_uj1gasnQh\""
 image_repositories = []
 
 [default.global.parameters]

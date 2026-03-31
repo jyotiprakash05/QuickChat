@@ -1,0 +1,155 @@
+﻿{
+    "jobSummaries": [
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000023",
+            "jobId": "23",
+            "status": "PENDING"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000022",
+            "jobId": "22",
+            "status": "PENDING"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000021",
+            "jobId": "21",
+            "status": "PENDING"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000020",
+            "jobId": "20",
+            "startTime": "2026-03-29T11:41:31.866000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-29T11:41:48.060000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000019",
+            "jobId": "19",
+            "startTime": "2026-03-29T01:59:40.192000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-29T02:00:09.206000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000018",
+            "jobId": "18",
+            "startTime": "2026-03-29T01:53:49.159000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-29T01:54:00.533000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000017",
+            "jobId": "17",
+            "status": "CANCELLED"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000016",
+            "jobId": "16",
+            "status": "CANCELLED"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000015",
+            "jobId": "15",
+            "startTime": "2026-03-29T01:43:40.338000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-29T01:44:02.626000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000014",
+            "jobId": "14",
+            "startTime": "2026-03-29T01:33:41.570000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-29T01:34:05.597000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000013",
+            "jobId": "13",
+            "startTime": "2026-03-28T12:14:30.707000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-28T12:14:46.451000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000012",
+            "jobId": "12",
+            "startTime": "2026-03-28T11:04:32.015000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-28T11:04:52.417000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000011",
+            "jobId": "11",
+            "startTime": "2026-03-24T21:28:15.524000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-24T21:28:31.677000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000010",
+            "jobId": "10",
+            "startTime": "2026-03-24T21:17:35.438000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-24T21:17:51.007000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000009",
+            "jobId": "9",
+            "startTime": "2026-03-22T13:04:36.451000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-22T13:04:50.834000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000008",
+            "jobId": "8",
+            "startTime": "2026-03-21T16:55:39.163000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-21T16:55:54.062000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000007",
+            "jobId": "7",
+            "startTime": "2026-03-21T16:24:58.534000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-21T16:25:13.195000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000006",
+            "jobId": "6",
+            "startTime": "2026-03-21T16:18:23.266000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-21T16:18:37.881000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000005",
+            "jobId": "5",
+            "startTime": "2026-03-21T16:13:53.447000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-21T16:14:07.431000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000004",
+            "jobId": "4",
+            "startTime": "2026-03-21T16:06:19.808000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-21T16:06:33.696000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000003",
+            "jobId": "3",
+            "startTime": "2026-03-21T16:03:32.313000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-21T16:03:46.835000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000002",
+            "jobId": "2",
+            "startTime": "2026-03-21T15:59:18.100000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-21T15:59:32.504000+05:30"
+        },
+        {
+            "jobArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging/jobs/0000000001",
+            "jobId": "1",
+            "startTime": "2026-03-21T13:07:51.242000+05:30",
+            "status": "SUCCEED",
+            "endTime": "2026-03-21T13:07:59.454000+05:30"
+        }
+    ]
+}

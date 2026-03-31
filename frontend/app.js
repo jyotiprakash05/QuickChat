@@ -75,6 +75,37 @@ let state = {
 
 const app = document.getElementById('app');
 
+// --- Presigned URL Cache (for S3 voice messages) ---
+const presignedUrlCache = {}; // { s3Key: { url, expiresAt } }
+
+function extractS3Key(url) {
+  if (!url || typeof url !== 'string') return null;
+  // Match: https://BUCKET.s3.amazonaws.com/KEY or https://BUCKET.s3.REGION.amazonaws.com/KEY
+  const match = url.match(/\.s3(?:\.[\w-]+)?\.amazonaws\.com\/(.+)$/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+async function resolveVoiceUrl(url) {
+  // blob: URLs or data: URLs are already playable (local recordings)
+  if (!url || url.startsWith('blob:') || url.startsWith('data:')) return url;
+  
+  const key = extractS3Key(url);
+  if (!key) return url; // Not an S3 URL, return as-is
+  
+  // Check cache (with 5-min buffer before expiry)
+  const cached = presignedUrlCache[key];
+  if (cached && cached.expiresAt > Date.now() + 300000) return cached.url;
+  
+  try {
+    const data = await ApiService.getDownloadUrl(key);
+    presignedUrlCache[key] = { url: data.downloadUrl, expiresAt: Date.now() + 3600000 }; // 1hr
+    return data.downloadUrl;
+  } catch (err) {
+    console.error('Failed to get presigned URL:', err);
+    return url; // Fallback to original URL
+  }
+}
+
 // --- Initialize ---
 async function boot() {
   const cognitoReady = AuthService.init();
@@ -145,13 +176,19 @@ async function loadMessages(convId) {
     state.messages[convId] = (data.messages || []).map(msg => {
       // Detect voice messages: check type OR fallback to URL pattern
       const isVoice = msg.type === 'voice' || 
-        (typeof msg.content === 'string' && msg.content.match(/\.(webm|ogg|mp3|m4a|wav)$/i));
+        (typeof msg.content === 'string' && msg.content.match(/\.(webm|ogg|mp3|m4a|wav)(\?.*)?$/i));
       if (isVoice) {
         msg.type = 'voice';
         if (!msg.voiceUrl) msg.voiceUrl = msg.content;
       }
       return msg;
     }).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+    
+    // Resolve presigned URLs for all voice messages
+    const voiceMsgs = state.messages[convId].filter(m => m.type === 'voice' && m.voiceUrl);
+    await Promise.all(voiceMsgs.map(async (msg) => {
+      msg.voiceUrl = await resolveVoiceUrl(msg.voiceUrl);
+    }));
   } catch (e) { console.error('loadMessages:', e); }
 }
 
@@ -161,15 +198,17 @@ function connectWebSocket() {
   WsService.on('connected', () => { state.wsConnected = true; updateConnectionBadge(); });
   WsService.on('disconnected', () => { state.wsConnected = false; updateConnectionBadge(); });
   
-  WsService.on('newMessage', (msg) => {
+  WsService.on('newMessage', async (msg) => {
     if (!state.messages[msg.conversationId]) state.messages[msg.conversationId] = [];
     
     // Detect voice messages: check type OR fallback to URL pattern
     const isVoice = msg.type === 'voice' || 
-      (typeof msg.content === 'string' && msg.content.match(/\.(webm|ogg|mp3|m4a|wav)$/i));
+      (typeof msg.content === 'string' && msg.content.match(/\.(webm|ogg|mp3|m4a|wav)(\?.*)?$/i));
     if (isVoice) {
       msg.type = 'voice';
       if (!msg.voiceUrl) msg.voiceUrl = msg.content;
+      // Resolve presigned URL for the receiver
+      msg.voiceUrl = await resolveVoiceUrl(msg.voiceUrl);
     }
     
     // Find if this is an update for one of OUR pending messages
@@ -178,7 +217,12 @@ function connectWebSocket() {
         m.content === msg.content || (m.type === 'voice' && msg.type === 'voice')
       ));
       if (pendingIdx !== -1) {
+        // Keep local blob URL for sender (already playable), but update other fields
+        const localVoiceUrl = state.messages[msg.conversationId][pendingIdx].voiceUrl;
         state.messages[msg.conversationId][pendingIdx] = msg;
+        if (isVoice && localVoiceUrl && localVoiceUrl.startsWith('blob:')) {
+          state.messages[msg.conversationId][pendingIdx].voiceUrl = localVoiceUrl;
+        }
       } else {
         if (!state.messages[msg.conversationId].find(m => m.messageId === msg.messageId)) {
           state.messages[msg.conversationId].push(msg);
@@ -192,12 +236,25 @@ function connectWebSocket() {
     
     state.messages[msg.conversationId].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-    const conv = state.conversations.find(c => c.conversationId === msg.conversationId);
+    let conv = state.conversations.find(c => (c.conversationId||c.id) === msg.conversationId);
+    if (!conv) {
+      if (state.isLive) {
+        // Fetch the conversation list to get this new conversation
+        await loadChats();
+        conv = state.conversations.find(c => (c.conversationId||c.id) === msg.conversationId);
+      } else {
+        // Fallback for demo mode
+        conv = { conversationId: msg.conversationId, otherDisplayName: 'New User', lastMessage: '', lastMessageAt: msg.timestamp, unreadCount: 0 };
+        state.conversations.unshift(conv);
+      }
+    }
+    
     if (conv) { 
       conv.lastMessage = msg.type === 'voice' ? '🎙️ Voice message' : msg.content; 
       conv.lastMessageAt = msg.timestamp; 
       if (state.activeConversationId !== msg.conversationId) conv.unreadCount = (conv.unreadCount||0)+1; 
     }
+    
     state.conversations.sort((a,b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt));
     if (state.activeConversationId === msg.conversationId) renderChatWindow();
     renderSidebar();
@@ -805,7 +862,10 @@ function renderSidebar() {
       const grad = getAvatarGradient(other.displayName);
       const currentTyping = state.typingUsers[cid] || {};
       const isTyping = Object.values(currentTyping).some(v => v);
-      const previewText = isTyping ? `<span class="typing-preview">typing...</span>` : escapeHtml(conv.lastMessage||'');
+      // Show '🎙️ Voice message' for voice messages instead of raw S3 URL
+      let rawPreview = conv.lastMessage || '';
+      if (!isTyping && rawPreview && extractS3Key(rawPreview)) rawPreview = '🎙️ Voice message';
+      const previewText = isTyping ? `<span class="typing-preview">typing...</span>` : escapeHtml(rawPreview);
       return `
         <div class="conv-item ${isActive?'conv-item--active':''}" data-conv-id="${cid}">
           <div class="conv-item__avatar">

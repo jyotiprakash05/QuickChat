@@ -1,0 +1,601 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: "QuickChat \u2014 Serverless Real-Time Chat Backend"
+Parameters:
+  Stage:
+    Type: String
+    Default: prod
+  CognitoUserPoolId:
+    Type: String
+    Description: The ID of the Cognito User Pool (e.g., us-east-1_XXXXXXXXX)
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs20.x
+    MemorySize: 256
+    Environment:
+      Variables:
+        USERS_TABLE:
+          Ref: UsersTable
+        CONVERSATIONS_TABLE:
+          Ref: ConversationsTable
+        MESSAGES_TABLE:
+          Ref: MessagesTable
+        CONNECTIONS_TABLE:
+          Ref: ConnectionsTable
+        ATTACHMENTS_BUCKET:
+          Ref: AttachmentsBucket
+        COGNITO_USER_POOL_ID:
+          Ref: CognitoUserPoolId
+Resources:
+  AttachmentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      CorsConfiguration:
+        CorsRules:
+        - AllowedOrigins:
+          - '*'
+          AllowedMethods:
+          - GET
+          - PUT
+          - POST
+          AllowedHeaders:
+          - '*'
+          MaxAge: 3000
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  WebAppBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+      - AttributeName: userId
+        AttributeType: S
+      KeySchema:
+      - AttributeName: userId
+        KeyType: HASH
+  ConversationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+      - AttributeName: conversationId
+        AttributeType: S
+      - AttributeName: userId
+        AttributeType: S
+      - AttributeName: lastMessageAt
+        AttributeType: S
+      KeySchema:
+      - AttributeName: conversationId
+        KeyType: HASH
+      - AttributeName: userId
+        KeyType: RANGE
+      GlobalSecondaryIndexes:
+      - IndexName: UserConversationsIndex
+        KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: lastMessageAt
+          KeyType: RANGE
+        Projection:
+          ProjectionType: ALL
+  MessagesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+      - AttributeName: conversationId
+        AttributeType: S
+      - AttributeName: messageId
+        AttributeType: S
+      KeySchema:
+      - AttributeName: conversationId
+        KeyType: HASH
+      - AttributeName: messageId
+        KeyType: RANGE
+  ConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+      - AttributeName: connectionId
+        AttributeType: S
+      - AttributeName: userId
+        AttributeType: S
+      KeySchema:
+      - AttributeName: connectionId
+        KeyType: HASH
+      GlobalSecondaryIndexes:
+      - IndexName: UserConnectionIndex
+        KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        Projection:
+          ProjectionType: ALL
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: QuickChat-WebSocket
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: $request.body.action
+  WebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId:
+        Ref: WebSocketApi
+      StageName:
+        Ref: Stage
+      AutoDeploy: true
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: WebSocketApi
+      RouteKey: $connect
+      AuthorizationType: NONE
+      Target:
+        Fn::Sub: integrations/${ConnectIntegration}
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId:
+        Ref: WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectFunction.Arn}/invocations
+  ConnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: ConnectFunction
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ConnectionsTable
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: UsersTable
+      - DynamoDBReadPolicy:
+          TableName:
+            Ref: ConversationsTable
+      - Statement:
+        - Effect: Allow
+          Action: execute-api:ManageConnections
+          Resource:
+            Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+    Metadata:
+      SamResourceId: ConnectFunction
+  ConnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: ConnectFunction
+      Principal: apigateway.amazonaws.com
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: WebSocketApi
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      Target:
+        Fn::Sub: integrations/${DisconnectIntegration}
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId:
+        Ref: WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DisconnectFunction.Arn}/invocations
+  DisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: DisconnectFunction
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ConnectionsTable
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: UsersTable
+      - DynamoDBReadPolicy:
+          TableName:
+            Ref: ConversationsTable
+      - Statement:
+        - Effect: Allow
+          Action: execute-api:ManageConnections
+          Resource:
+            Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+    Metadata:
+      SamResourceId: DisconnectFunction
+  DisconnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: DisconnectFunction
+      Principal: apigateway.amazonaws.com
+  SendMessageRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: WebSocketApi
+      RouteKey: sendMessage
+      AuthorizationType: NONE
+      Target:
+        Fn::Sub: integrations/${SendMessageIntegration}
+  SendMessageIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId:
+        Ref: WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageFunction.Arn}/invocations
+  SendMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: SendMessageFunction
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: MessagesTable
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ConversationsTable
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ConnectionsTable
+      - Statement:
+        - Effect: Allow
+          Action: execute-api:ManageConnections
+          Resource:
+            Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+    Metadata:
+      SamResourceId: SendMessageFunction
+  SendMessagePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: SendMessageFunction
+      Principal: apigateway.amazonaws.com
+  TypingRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: WebSocketApi
+      RouteKey: typing
+      AuthorizationType: NONE
+      Target:
+        Fn::Sub: integrations/${TypingIntegration}
+  TypingIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId:
+        Ref: WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TypingFunction.Arn}/invocations
+  TypingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: TypingFunction
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ConnectionsTable
+      - Statement:
+        - Effect: Allow
+          Action: execute-api:ManageConnections
+          Resource:
+            Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+    Metadata:
+      SamResourceId: TypingFunction
+  TypingPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: TypingFunction
+      Principal: apigateway.amazonaws.com
+  DeleteMessageRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: WebSocketApi
+      RouteKey: deleteMessage
+      AuthorizationType: NONE
+      Target:
+        Fn::Sub: integrations/${DeleteMessageIntegration}
+  DeleteMessageIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId:
+        Ref: WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteMessageFunction.Arn}/invocations
+  DeleteMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: DeleteMessageFunction
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: MessagesTable
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ConnectionsTable
+      - Statement:
+        - Effect: Allow
+          Action: execute-api:ManageConnections
+          Resource:
+            Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+    Metadata:
+      SamResourceId: DeleteMessageFunction
+  DeleteMessagePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: DeleteMessageFunction
+      Principal: apigateway.amazonaws.com
+  RestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: QuickChat-REST
+      StageName:
+        Ref: Stage
+      Cors:
+        AllowMethods: '''GET,POST,PUT,DELETE,OPTIONS'''
+        AllowHeaders: '''Content-Type,Authorization'''
+        AllowOrigin: '''*'''
+  GetMessagesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: GetMessagesFunction
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: MessagesTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: RestApi
+            Path: /messages
+            Method: GET
+    Metadata:
+      SamResourceId: GetMessagesFunction
+  GetChatsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: GetChatsFunction
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ConversationsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: RestApi
+            Path: /chats
+            Method: GET
+    Metadata:
+      SamResourceId: GetChatsFunction
+  UpdateProfileFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: UpdateProfileFunction
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: UsersTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: RestApi
+            Path: /profile
+            Method: PUT
+    Metadata:
+      SamResourceId: UpdateProfileFunction
+  GetUploadUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: GetUploadUrlFunction
+      Policies:
+      - S3CrudPolicy:
+          BucketName:
+            Ref: AttachmentsBucket
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: RestApi
+            Path: /upload-url
+            Method: POST
+    Metadata:
+      SamResourceId: GetUploadUrlFunction
+  CreateConversationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: CreateConversationFunction
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ConversationsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: RestApi
+            Path: /conversations
+            Method: POST
+    Metadata:
+      SamResourceId: CreateConversationFunction
+  SearchUsersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: SearchUsersFunction
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: UsersTable
+      - Statement:
+        - Effect: Allow
+          Action:
+          - cognito-idp:ListUsers
+          Resource:
+            Fn::Sub: arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: RestApi
+            Path: /users/search
+            Method: GET
+    Metadata:
+      SamResourceId: SearchUsersFunction
+  SyncUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: SyncUserFunction
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: UsersTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: RestApi
+            Path: /sync-user
+            Method: POST
+    Metadata:
+      SamResourceId: SyncUserFunction
+  DeleteUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: DeleteUserFunction
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: UsersTable
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ConversationsTable
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: MessagesTable
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ConnectionsTable
+      - Statement:
+        - Effect: Allow
+          Action:
+          - cognito-idp:AdminDeleteUser
+          Resource:
+            Fn::Sub: arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: RestApi
+            Path: /delete-user
+            Method: POST
+    Metadata:
+      SamResourceId: DeleteUserFunction
+  PostConfirmationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: PostConfirmationFunction
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: UsersTable
+    Metadata:
+      SamResourceId: PostConfirmationFunction
+  GetStatsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: GetStatsFunction
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Ref: UsersTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: RestApi
+            Path: /stats
+            Method: GET
+    Metadata:
+      SamResourceId: GetStatsFunction
+Outputs:
+  WebSocketUrl:
+    Description: WebSocket API URL
+    Value:
+      Fn::Sub: wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+  RestApiUrl:
+    Description: REST API URL
+    Value:
+      Fn::Sub: https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+  UsersTableName:
+    Value:
+      Ref: UsersTable
+  ConversationsTableName:
+    Value:
+      Ref: ConversationsTable
+  MessagesTableName:
+    Value:
+      Ref: MessagesTable
+  ConnectionsTableName:
+    Value:
+      Ref: ConnectionsTable
+  AttachmentsBucketName:
+    Value:
+      Ref: AttachmentsBucket
+  WebAppUrl:
+    Description: URL for the web application (Direct S3 - HTTP)
+    Value:
+      Fn::GetAtt:
+      - WebAppBucket
+      - WebsiteURL

@@ -332,6 +332,8 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref MessagesTable
         - DynamoDBCrudPolicy:
+            TableName: !Ref ConversationsTable
+        - DynamoDBCrudPolicy:
             TableName: !Ref ConnectionsTable
         - Statement:
             - Effect: Allow
@@ -422,6 +424,22 @@ Resources:
             RestApiId: !Ref RestApi
             Path: /upload-url
             Method: POST
+
+  GetDownloadUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: lambdas/getDownloadUrl
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref AttachmentsBucket
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref RestApi
+            Path: /download-url
+            Method: GET
 
   CreateConversationFunction:
     Type: AWS::Serverless::Function

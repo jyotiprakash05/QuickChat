@@ -14,7 +14,7 @@ export const handler = async (event) => {
     return wsError(400, 'Invalid JSON');
   }
 
-  const { conversationId, senderId, content, recipientId } = body;
+  const { conversationId, senderId, content, recipientId, type = 'text', voiceDuration } = body;
 
   if (!conversationId || !senderId || !content) {
     return wsError(400, 'Missing required fields: conversationId, senderId, content');
@@ -33,7 +33,8 @@ export const handler = async (event) => {
         senderId,
         content,
         timestamp,
-        type: 'text',
+        type,
+        ...(voiceDuration !== undefined ? { voiceDuration } : {}),
       },
     }));
 
@@ -43,7 +44,7 @@ export const handler = async (event) => {
       Key: { conversationId, userId: senderId },
       UpdateExpression: 'SET lastMessage = :msg, lastMessageAt = :ts',
       ExpressionAttributeValues: {
-        ':msg': content.substring(0, 100),
+        ':msg': type === 'voice' ? '🎙️ Voice message' : content.substring(0, 100),
         ':ts': timestamp,
       },
     }));
@@ -55,30 +56,39 @@ export const handler = async (event) => {
         Key: { conversationId, userId: recipientId },
         UpdateExpression: 'SET lastMessage = :msg, lastMessageAt = :ts',
         ExpressionAttributeValues: {
-          ':msg': content.substring(0, 100),
+          ':msg': type === 'voice' ? '🎙️ Voice message' : content.substring(0, 100),
           ':ts': timestamp,
         },
       }));
+    }
 
-      // Find recipient's active connections
+    // Find connections for both sender and recipient
+    const participants = [senderId];
+    if (recipientId && recipientId !== senderId) participants.push(recipientId);
+
+    const apiClient = new ApiGatewayManagementApiClient({
+      endpoint: `https://${domainName}/${stage}`,
+    });
+
+    const messagePayload = JSON.stringify({
+      action: 'newMessage',
+      message: { 
+        messageId, conversationId, senderId, content, timestamp, type,
+        ...(type === 'voice' ? { voiceUrl: content, voiceDuration } : {}),
+      },
+    });
+
+    const notifyPromises = participants.map(async (uid) => {
       const connectionsResult = await docClient.send(new QueryCommand({
         TableName: TABLES.CONNECTIONS,
         IndexName: 'UserConnectionIndex',
         KeyConditionExpression: 'userId = :uid',
-        ExpressionAttributeValues: { ':uid': recipientId },
+        ExpressionAttributeValues: { ':uid': uid },
       }));
 
-      // Push message to recipient's WebSocket connections
-      const apiClient = new ApiGatewayManagementApiClient({
-        endpoint: `https://${domainName}/${stage}`,
-      });
-
-      const messagePayload = JSON.stringify({
-        action: 'newMessage',
-        message: { messageId, conversationId, senderId, content, timestamp, type: 'text' },
-      });
-
-      const sendPromises = (connectionsResult.Items || []).map(async (conn) => {
+      const connPromises = (connectionsResult.Items || []).map(async (conn) => {
+        // We push to ALL connections, even the sender's one.
+        // The sender's client should handle this to update their local state.
         try {
           await apiClient.send(new PostToConnectionCommand({
             ConnectionId: conn.connectionId,
@@ -86,7 +96,6 @@ export const handler = async (event) => {
           }));
         } catch (err) {
           if (err.statusCode === 410 || err.name === 'GoneException') {
-            // Stale connection — clean up
             await docClient.send(new DeleteCommand({
               TableName: TABLES.CONNECTIONS,
               Key: { connectionId: conn.connectionId },
@@ -96,9 +105,10 @@ export const handler = async (event) => {
           }
         }
       });
+      await Promise.all(connPromises);
+    });
 
-      await Promise.all(sendPromises);
-    }
+    await Promise.all(notifyPromises);
 
     console.log(`Message ${messageId} sent in conversation ${conversationId}`);
     return wsSuccess();

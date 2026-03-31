@@ -60,6 +60,7 @@ export const handler = async (event) => {
           ':ts': timestamp,
         },
       }));
+    }
 
     // Find connections for both sender and recipient
     const participants = [senderId];
@@ -85,7 +86,7 @@ export const handler = async (event) => {
         ExpressionAttributeValues: { ':uid': uid },
       }));
 
-      return (connectionsResult.Items || []).map(async (conn) => {
+      const connPromises = (connectionsResult.Items || []).map(async (conn) => {
         // We push to ALL connections, even the sender's one.
         // The sender's client should handle this to update their local state.
         try {
@@ -104,9 +105,10 @@ export const handler = async (event) => {
           }
         }
       });
+      await Promise.all(connPromises);
     });
 
-    await Promise.all(notifyPromises.flat());
+    await Promise.all(notifyPromises);
 
     console.log(`Message ${messageId} sent in conversation ${conversationId}`);
     return wsSuccess();

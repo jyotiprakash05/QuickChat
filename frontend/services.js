@@ -12,7 +12,12 @@ const ApiService = (() => {
     };
     if (token) opts.headers['Authorization'] = token;
     if (body) opts.body = JSON.stringify(body);
-    const res = await fetch(`${CONFIG.API_URL}${path}`, opts);
+    
+    // Add cache buster for GET requests to prevent browser from caching stale data
+    const delimiter = path.includes('?') ? '&' : '?';
+    const finalPath = method === 'GET' ? `${path}${delimiter}t=${Date.now()}` : path;
+    
+    const res = await fetch(`${CONFIG.API_URL}${finalPath}`, opts);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     return data;
@@ -63,7 +68,11 @@ const ApiService = (() => {
     return request('POST', '/sync-user', { userId, email, displayName });
   }
 
-  return { getChats, getMessages, updateProfile, getUploadUrl, uploadFile, searchUsers, createConversation, getStats, syncUser };
+  function getDownloadUrl(key) {
+    return request('GET', `/download-url?key=${encodeURIComponent(key)}`);
+  }
+
+  return { getChats, getMessages, updateProfile, getUploadUrl, uploadFile, searchUsers, createConversation, getStats, syncUser, getDownloadUrl };
 })();
 
 // ============================================
