@@ -115,11 +115,25 @@ async function boot() {
     try {
       const userData = await AuthService.restoreSession();
       state.currentUser = { userId: userData.userId, email: userData.email, displayName: userData.displayName, status: 'online' };
+      
+      // Load previous state from URL if present
+      const urlParams = new URLSearchParams(window.location.search);
+      const activeConvoId = urlParams.get('convId');
+      if (activeConvoId) state.activeConversationId = activeConvoId;
+
       state.view = 'chat';
       render();
-      // Sync user to DynamoDB (ensures they exist even if PostConfirmation trigger failed)
+
       try { await ApiService.syncUser(userData.userId, userData.email, userData.displayName); } catch (e) { console.warn('syncUser on restore:', e); }
+      
       await loadChats();
+      
+      // If we have an active conversation, load its messages immediately
+      if (state.activeConversationId) {
+        await loadMessages(state.activeConversationId);
+        renderChatWindow();
+      }
+
       connectWebSocket();
       return;
     } catch (_) { /* no stored session */ }
