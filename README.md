@@ -2,8 +2,7 @@
 
 QuickChat is a modern, serverless, real-time messaging application built on AWS and lightweight native browser technologies. It features instant message synchronization, voice messaging, secure user authentication, and a responsive glassmorphic frontend UI.
 
-![QuickChat](https://img.shields.io/badge/QuickChat-v2.0-4A90E2?style=for-the-badge) ![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-F7DF1E?style=flat-square&logo=javascript) ![AWS](https://img.shields.io/badge/AWS-Serverless-FF9900?style=flat-square&logo=amazon-aws) ![Node.js](https://img.shields.io/badge/Node.js-Lambdas-339933?style=flat-square&logo=nodedotjs)
-
+ Application Link:-https://staging.d3d0secabw2iz2.amplifyapp.com/
 ## ✨ Features
 
 - 🔐 **Authentication** — Sign up and login with AWS Cognito via SMS verification.
