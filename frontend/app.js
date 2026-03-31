@@ -116,10 +116,9 @@ async function boot() {
       const userData = await AuthService.restoreSession();
       state.currentUser = { userId: userData.userId, email: userData.email, displayName: userData.displayName, status: 'online' };
       
-      // Load previous state from URL if present
+      // Load previous state from localStorage or URL
       const urlParams = new URLSearchParams(window.location.search);
-      const activeConvoId = urlParams.get('convId');
-      if (activeConvoId) state.activeConversationId = activeConvoId;
+      state.activeConversationId = urlParams.get('convId') || localStorage.getItem('qc_active_conv');
 
       state.view = 'chat';
       render();
@@ -128,7 +127,6 @@ async function boot() {
       
       await loadChats();
       
-      // If we have an active conversation, load its messages immediately
       if (state.activeConversationId) {
         await loadMessages(state.activeConversationId);
         renderChatWindow();
@@ -136,7 +134,7 @@ async function boot() {
 
       connectWebSocket();
       return;
-    } catch (_) { /* no stored session */ }
+    } catch (err) { console.warn('No session:', err); }
   }
   render();
 }
@@ -343,26 +341,26 @@ function render() {
 
 // --- Navigation & History ---
 async function navigate(view, push = true, params = {}) {
-  // Save specific states
   if (params.activeConversationId !== undefined) {
     state.activeConversationId = params.activeConversationId;
     if (state.activeConversationId) {
+      localStorage.setItem('qc_active_conv', state.activeConversationId);
       const conv = state.conversations.find(c => (c.conversationId||c.id) === state.activeConversationId);
       if (conv) conv.unreadCount = 0;
       if (state.isLive && (!state.messages[state.activeConversationId] || !state.messages[state.activeConversationId].length)) {
         await loadMessages(state.activeConversationId);
       }
+    } else {
+      localStorage.removeItem('qc_active_conv');
     }
   }
   
   state.view = view;
   
   if (push) {
-    const historyState = { 
-      view: state.view, 
-      activeConversationId: state.activeConversationId 
-    };
-    history.pushState(historyState, '');
+    const url = state.activeConversationId ? `?convId=${state.activeConversationId}` : '';
+    const historyState = { view: state.view, activeConversationId: state.activeConversationId };
+    history.pushState(historyState, '', window.location.pathname + url);
   }
   
   render();
