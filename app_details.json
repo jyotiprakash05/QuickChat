@@ -1,0 +1,35 @@
+﻿{
+    "app": {
+        "appId": "d3d0secabw2iz2",
+        "appArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2",
+        "name": "QuickChat",
+        "tags": {},
+        "platform": "WEB",
+        "createTime": "2026-03-21T13:07:38.270000+05:30",
+        "updateTime": "2026-03-21T13:07:38.270000+05:30",
+        "defaultDomain": "d3d0secabw2iz2.amplifyapp.com",
+        "enableBranchAutoBuild": false,
+        "enableBranchAutoDeletion": false,
+        "enableBasicAuth": false,
+        "customRules": [
+            {
+                "source": "/<*>",
+                "target": "/index.html",
+                "status": "404-200"
+            }
+        ],
+        "productionBranch": {
+            "lastDeployTime": "2026-03-31T20:27:04.121000+05:30",
+            "status": "SUCCEED",
+            "branchName": "staging"
+        },
+        "customHeaders": "",
+        "enableAutoBranchCreation": false,
+        "cacheConfig": {
+            "type": "AMPLIFY_MANAGED_NO_COOKIES"
+        },
+        "jobConfig": {
+            "buildComputeType": "STANDARD_8GB"
+        }
+    }
+}

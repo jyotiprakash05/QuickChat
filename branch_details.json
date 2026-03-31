@@ -1,0 +1,22 @@
+﻿{
+    "branches": [
+        {
+            "branchArn": "arn:aws:amplify:ap-south-1:545224914431:apps/d3d0secabw2iz2/branches/staging",
+            "branchName": "staging",
+            "tags": {},
+            "stage": "PRODUCTION",
+            "displayName": "staging",
+            "enableNotification": false,
+            "createTime": "2026-03-21T13:07:38.583000+05:30",
+            "updateTime": "2026-03-31T20:27:04.194000+05:30",
+            "enableAutoBuild": true,
+            "activeJobId": "0000000027",
+            "totalNumberOfJobs": "0",
+            "enableBasicAuth": false,
+            "enablePerformanceMode": false,
+            "ttl": "5",
+            "enablePullRequestPreview": false,
+            "backend": {}
+        }
+    ]
+}
